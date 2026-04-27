@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Future Fort Randomizer</title>
+  <title>Future Fort Randomizer v3</title>
   <style>
     :root {
       color-scheme: dark;
@@ -135,6 +135,31 @@
       transition: opacity 400ms ease;
     }
     #hint.hidden { opacity: 0; }
+    #gestureCatcher {
+      position: absolute;
+      inset: 0;
+      z-index: 4;
+      background: transparent;
+      outline: none;
+      cursor: default;
+      touch-action: manipulation;
+    }
+    #gestureCatcher.flash::after {
+      content: attr(data-state);
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      padding: 14px 18px;
+      border-radius: 999px;
+      background: rgba(0,0,0,0.55);
+      border: 1px solid rgba(255,255,255,0.25);
+      color: rgba(255,255,255,0.95);
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      backdrop-filter: blur(10px);
+      pointer-events: none;
+    }
     @media (max-width: 720px) {
       #controls {
         justify-content: flex-start;
@@ -146,7 +171,7 @@
   </style>
 </head>
 <body>
-  <div id="hint">Press A / Enter / F for fullscreen</div>
+  <div id="hint">First input: fullscreen • second input: play • then toggle play/pause</div>
   <div id="shell">
     <main id="playerWrap">
       <iframe id="player"
@@ -162,6 +187,8 @@
           <p style="margin-top:16px;">If the embed gets weird, use “Open YouTube.” Tasker can also launch this page with <code>?mode=redirect</code>.</p>
         </div>
       </div>
+
+      <div id="gestureCatcher" tabindex="0" role="button" aria-label="Fullscreen and play control" data-state="Ready"></div>
     </main>
 
     <nav id="controls" aria-label="Controls">
@@ -724,8 +751,10 @@
       const url = new URL(`https://www.youtube.com/embed/${video.id}`);
       url.searchParams.set("autoplay", autoplay ? "1" : "0");
       url.searchParams.set("playsinline", "1");
+      url.searchParams.set("enablejsapi", "1");
       url.searchParams.set("rel", "0");
       url.searchParams.set("modestbranding", "1");
+      if (location.origin && location.origin.startsWith("http")) url.searchParams.set("origin", location.origin);
       if (mute) url.searchParams.set("mute", "1");
       if (startSeconds > 0) url.searchParams.set("start", String(startSeconds));
       return url.toString();
@@ -757,58 +786,169 @@
 
     const fullscreenBtn = document.getElementById("fullscreenBtn");
     const playerWrap = document.getElementById("playerWrap");
+    const gestureCatcher = document.getElementById("gestureCatcher");
+    const frame = document.getElementById("player");
+
+    let fullscreenHasBeenRequested = false;
+    let firstPlayCommandHasBeenSent = false;
+    let assumedPlaying = false;
+    let lastGestureAt = 0;
+
+    function flash(message) {
+      gestureCatcher.dataset.state = message;
+      gestureCatcher.classList.add("flash");
+      clearTimeout(gestureCatcher._flashTimer);
+      gestureCatcher._flashTimer = setTimeout(() => gestureCatcher.classList.remove("flash"), 650);
+    }
+
+    function focusCatcher() {
+      try { gestureCatcher.focus({ preventScroll: true }); } catch (e) {}
+    }
+
+    function playerCommand(func, args = []) {
+      try {
+        frame.contentWindow.postMessage(JSON.stringify({
+          event: "command",
+          func,
+          args
+        }), "https://www.youtube.com");
+      } catch (e) {
+        console.log("YouTube command failed:", func, e);
+      }
+    }
+
+    async function enterFullscreen() {
+      try {
+        if (!document.fullscreenElement) {
+          await playerWrap.requestFullscreen();
+          fullscreenHasBeenRequested = true;
+          flash("Fullscreen");
+        }
+      } catch (e) {
+        console.log("Fullscreen blocked:", e);
+        flash("Fullscreen blocked");
+      } finally {
+        focusCatcher();
+      }
+    }
 
     async function toggleFullscreen() {
       try {
-        if (document.fullscreenElement) await document.exitFullscreen();
-        else await playerWrap.requestFullscreen();
+        if (document.fullscreenElement) {
+          await document.exitFullscreen();
+          flash("Exit fullscreen");
+        } else {
+          await enterFullscreen();
+        }
       } catch (e) {
-        console.log("Fullscreen blocked:", e);
+        console.log("Fullscreen toggle blocked:", e);
+      } finally {
+        focusCatcher();
       }
     }
 
-    fullscreenBtn.addEventListener("click", toggleFullscreen);
+    function playFirstThenToggle() {
+      if (!firstPlayCommandHasBeenSent) {
+        playerCommand("playVideo");
+        firstPlayCommandHasBeenSent = true;
+        assumedPlaying = true;
+        flash("Play");
+      } else if (assumedPlaying) {
+        playerCommand("pauseVideo");
+        assumedPlaying = false;
+        flash("Pause");
+      } else {
+        playerCommand("playVideo");
+        assumedPlaying = true;
+        flash("Play");
+      }
+      focusCatcher();
+    }
 
-    // Controller-friendly mode: keep the Fullscreen button focused so a gamepad A
-    // press usually acts like Enter/Click in Android browsers. This is more reliable
-    // than trying to force fullscreen automatically.
+    async function primaryGesture(source = "input") {
+      const nowTime = Date.now();
+      if (nowTime - lastGestureAt < 220) return;
+      lastGestureAt = nowTime;
+
+      if (!fullscreenHasBeenRequested && !document.fullscreenElement) {
+        await enterFullscreen();
+      } else {
+        playFirstThenToggle();
+      }
+    }
+
+    fullscreenBtn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      toggleFullscreen();
+    });
+
+    ["click", "pointerdown", "mousedown", "touchstart"].forEach(type => {
+      gestureCatcher.addEventListener(type, (event) => {
+        event.preventDefault();
+        primaryGesture(type);
+      }, { passive: false });
+    });
+
     let focusAttempts = 0;
     const focusTimer = setInterval(() => {
       focusAttempts += 1;
-      if (!document.fullscreenElement) fullscreenBtn.focus({ preventScroll: true });
-      if (focusAttempts > 8 || document.fullscreenElement) clearInterval(focusTimer);
-    }, 700);
+      focusCatcher();
+      if (focusAttempts > 20) clearInterval(focusTimer);
+    }, 500);
+    window.addEventListener("focus", focusCatcher);
+    document.addEventListener("fullscreenchange", focusCatcher);
 
     window.addEventListener("keydown", (event) => {
-      const keys = ["Enter", " ", "Spacebar", "f", "F"];
-      if (keys.includes(event.key)) {
+      const key = event.key;
+      const primaryKeys = ["Enter", " ", "Spacebar", "Space"];
+      if (primaryKeys.includes(key)) {
+        event.preventDefault();
+        primaryGesture("keyboard-primary");
+        return;
+      }
+
+      if (key === "f" || key === "F") {
         event.preventDefault();
         toggleFullscreen();
+        return;
       }
-      if (event.key === "r" || event.key === "R") {
+      if (key === "p" || key === "P" || key === "x" || key === "X") {
+        event.preventDefault();
+        playFirstThenToggle();
+        return;
+      }
+      if (key === "r" || key === "R") {
         event.preventDefault();
         document.getElementById("shuffleBtn").click();
+        return;
       }
     });
 
-    // Experimental: if the browser exposes the Gamepad API, button 0 is usually A.
-    // Some browsers may not count this as a fullscreen-eligible gesture, but it costs
-    // nothing to try.
-    let lastA = false;
-    function pollGamepad() {
-      const pads = navigator.getGamepads ? navigator.getGamepads() : [];
-      const pad = pads && Array.from(pads).find(Boolean);
-      const pressed = !!(pad && pad.buttons && pad.buttons[0] && pad.buttons[0].pressed);
-      if (pressed && !lastA) toggleFullscreen();
-      lastA = pressed;
-      requestAnimationFrame(pollGamepad);
+    const lastButtons = new Map();
+    function buttonPressedOnce(pad, index) {
+      const pressed = !!(pad.buttons && pad.buttons[index] && pad.buttons[index].pressed);
+      const key = `${pad.index}:${index}`;
+      const last = !!lastButtons.get(key);
+      lastButtons.set(key, pressed);
+      return pressed && !last;
     }
-    requestAnimationFrame(pollGamepad);
+
+    function pollGamepads() {
+      const pads = navigator.getGamepads ? Array.from(navigator.getGamepads()).filter(Boolean) : [];
+      for (const pad of pads) {
+        if (buttonPressedOnce(pad, 0)) primaryGesture("gamepad-a");
+        if (buttonPressedOnce(pad, 2)) playFirstThenToggle();
+        if (buttonPressedOnce(pad, 9)) playFirstThenToggle();
+        if (buttonPressedOnce(pad, 3)) document.getElementById("shuffleBtn").click();
+      }
+      requestAnimationFrame(pollGamepads);
+    }
+    requestAnimationFrame(pollGamepads);
 
     setTimeout(() => {
       const hint = document.getElementById("hint");
       if (hint) hint.classList.add("hidden");
-    }, 8000);
+    }, 9000);
 
     document.getElementById("copyBtn").addEventListener("click", async () => {
       try {
