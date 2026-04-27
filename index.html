@@ -112,6 +112,29 @@
       white-space: nowrap;
       padding: 0 4px;
     }
+    #fullscreenBtn:focus {
+      outline: 3px solid rgba(255,255,255,0.88);
+      outline-offset: 3px;
+    }
+    #hint {
+      position: fixed;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 5;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: rgba(0,0,0,0.45);
+      color: rgba(255,255,255,0.86);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      backdrop-filter: blur(14px);
+      pointer-events: none;
+      opacity: 0.8;
+      transition: opacity 400ms ease;
+    }
+    #hint.hidden { opacity: 0; }
     @media (max-width: 720px) {
       #controls {
         justify-content: flex-start;
@@ -123,6 +146,7 @@
   </style>
 </head>
 <body>
+  <div id="hint">Press A / Enter / F for fullscreen</div>
   <div id="shell">
     <main id="playerWrap">
       <iframe id="player"
@@ -731,15 +755,60 @@
       location.href = next.toString();
     });
 
-    document.getElementById("fullscreenBtn").addEventListener("click", async () => {
-      const target = document.getElementById("playerWrap");
+    const fullscreenBtn = document.getElementById("fullscreenBtn");
+    const playerWrap = document.getElementById("playerWrap");
+
+    async function toggleFullscreen() {
       try {
         if (document.fullscreenElement) await document.exitFullscreen();
-        else await target.requestFullscreen();
+        else await playerWrap.requestFullscreen();
       } catch (e) {
-        alert("Fullscreen needs a direct tap or may be blocked by this browser.");
+        console.log("Fullscreen blocked:", e);
+      }
+    }
+
+    fullscreenBtn.addEventListener("click", toggleFullscreen);
+
+    // Controller-friendly mode: keep the Fullscreen button focused so a gamepad A
+    // press usually acts like Enter/Click in Android browsers. This is more reliable
+    // than trying to force fullscreen automatically.
+    let focusAttempts = 0;
+    const focusTimer = setInterval(() => {
+      focusAttempts += 1;
+      if (!document.fullscreenElement) fullscreenBtn.focus({ preventScroll: true });
+      if (focusAttempts > 8 || document.fullscreenElement) clearInterval(focusTimer);
+    }, 700);
+
+    window.addEventListener("keydown", (event) => {
+      const keys = ["Enter", " ", "Spacebar", "f", "F"];
+      if (keys.includes(event.key)) {
+        event.preventDefault();
+        toggleFullscreen();
+      }
+      if (event.key === "r" || event.key === "R") {
+        event.preventDefault();
+        document.getElementById("shuffleBtn").click();
       }
     });
+
+    // Experimental: if the browser exposes the Gamepad API, button 0 is usually A.
+    // Some browsers may not count this as a fullscreen-eligible gesture, but it costs
+    // nothing to try.
+    let lastA = false;
+    function pollGamepad() {
+      const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+      const pad = pads && Array.from(pads).find(Boolean);
+      const pressed = !!(pad && pad.buttons && pad.buttons[0] && pad.buttons[0].pressed);
+      if (pressed && !lastA) toggleFullscreen();
+      lastA = pressed;
+      requestAnimationFrame(pollGamepad);
+    }
+    requestAnimationFrame(pollGamepad);
+
+    setTimeout(() => {
+      const hint = document.getElementById("hint");
+      if (hint) hint.classList.add("hidden");
+    }, 8000);
 
     document.getElementById("copyBtn").addEventListener("click", async () => {
       try {
