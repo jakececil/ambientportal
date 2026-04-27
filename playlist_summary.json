@@ -1,0 +1,13 @@
+{
+  "total_unique_videos": 3628,
+  "playlist_counts": {
+    "Future Fort": 100,
+    "Dream Spelunking": 137,
+    "Biology": 220,
+    "Gut Punch": 390,
+    "Trashland": 640,
+    "Animation": 389,
+    "Zang": 1752
+  },
+  "notes": "Drop index.html into the GitHub Pages repo. Use ?debug=1 for diagnostics, ?mute=1 for muted autoplay testing, ?mode=redirect for direct YouTube redirection."
+}
