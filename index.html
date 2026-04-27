@@ -3,962 +3,488 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Future Fort Randomizer v3</title>
+  <title>Future Fort Randomizer</title>
   <style>
     :root {
       color-scheme: dark;
-      --bg: #050507;
-      --fg: #f5f3ea;
-      --muted: #aaa49a;
-      --panel: rgba(255,255,255,0.075);
-      --panel2: rgba(255,255,255,0.12);
+      background: #000;
     }
-    * { box-sizing: border-box; }
-    body {
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
       margin: 0;
-      min-height: 100vh;
-      background:
-        radial-gradient(circle at 20% 0%, rgba(87,113,255,0.18), transparent 35%),
-        radial-gradient(circle at 80% 100%, rgba(255,181,67,0.12), transparent 38%),
-        var(--bg);
-      color: var(--fg);
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      width: 100%;
+      height: 100%;
       overflow: hidden;
+      background: #000;
+      color: #f4f4f4;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
-    #shell {
+
+    body {
+      position: fixed;
+      inset: 0;
+      overscroll-behavior: none;
+      touch-action: manipulation;
+      user-select: none;
+    }
+
+    #stage {
+      position: fixed;
+      inset: 0;
       width: 100vw;
       height: 100vh;
-      display: grid;
-      grid-template-rows: 1fr auto;
-    }
-    #playerWrap {
-      position: relative;
-      width: 100%;
-      height: 100%;
       background: #000;
-      display: grid;
-      place-items: center;
-    }
-    iframe {
-      width: 100%;
-      height: 100%;
-      border: 0;
-      background: #000;
-    }
-    #fallback {
-      position: absolute;
-      inset: 0;
-      display: none;
-      place-items: center;
-      text-align: center;
-      padding: 28px;
-      background: linear-gradient(145deg, rgba(0,0,0,0.82), rgba(15,15,22,0.96));
-    }
-    .card {
-      max-width: 760px;
-      padding: 26px;
-      border-radius: 24px;
-      background: var(--panel);
-      box-shadow: 0 18px 70px rgba(0,0,0,0.45);
-      backdrop-filter: blur(18px);
-    }
-    h1 {
-      margin: 0 0 10px;
-      font-size: clamp(24px, 5vw, 54px);
-      letter-spacing: -0.04em;
-      line-height: 0.94;
-    }
-    p {
-      color: var(--muted);
-      line-height: 1.45;
-      margin: 8px 0 0;
-    }
-    #controls {
-      position: fixed;
-      left: 12px;
-      right: 12px;
-      bottom: 12px;
       display: flex;
-      gap: 8px;
       align-items: center;
       justify-content: center;
-      flex-wrap: wrap;
-      padding: 8px;
-      border-radius: 20px;
-      background: rgba(0,0,0,0.36);
-      backdrop-filter: blur(14px);
-      opacity: 0.18;
-      transition: opacity 180ms ease;
-    }
-    #controls:hover, #controls:focus-within { opacity: 1; }
-    button, a.button {
-      border: 0;
-      text-decoration: none;
-      color: var(--fg);
-      background: var(--panel2);
-      padding: 11px 14px;
-      border-radius: 999px;
-      font-weight: 700;
-      font-size: 14px;
-      cursor: pointer;
-    }
-    button:active, a.button:active { transform: scale(0.98); }
-    #now {
-      min-width: min(100%, 340px);
-      color: var(--muted);
-      font-size: 12px;
       overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      padding: 0 4px;
     }
-    #fullscreenBtn:focus {
-      outline: 3px solid rgba(255,255,255,0.88);
-      outline-offset: 3px;
-    }
-    #hint {
-      position: fixed;
-      top: 12px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 5;
-      padding: 10px 14px;
-      border-radius: 999px;
-      background: rgba(0,0,0,0.45);
-      color: rgba(255,255,255,0.86);
-      font-size: 13px;
-      font-weight: 700;
-      letter-spacing: 0.01em;
-      backdrop-filter: blur(14px);
-      pointer-events: none;
-      opacity: 0.8;
-      transition: opacity 400ms ease;
-    }
-    #hint.hidden { opacity: 0; }
-    #gestureCatcher {
+
+    #player {
       position: absolute;
       inset: 0;
-      z-index: 4;
+      width: 100vw;
+      height: 100vh;
+      border: 0;
+      background: #000;
+    }
+
+    /*
+      This transparent input catcher is deliberately huge.
+      It lets the page receive a real user gesture before giving control
+      back to the YouTube iframe. First input fullscreen. Later input play/pause.
+    */
+    #gestureCatcher {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
       background: transparent;
-      outline: none;
-      cursor: default;
-      touch-action: manipulation;
+      cursor: none;
     }
-    #gestureCatcher.flash::after {
-      content: attr(data-state);
-      position: absolute;
+
+    #hint {
+      position: fixed;
       left: 50%;
-      top: 50%;
-      transform: translate(-50%, -50%);
-      padding: 14px 18px;
+      bottom: max(18px, env(safe-area-inset-bottom));
+      transform: translateX(-50%);
+      z-index: 30;
+      padding: 8px 12px;
       border-radius: 999px;
-      background: rgba(0,0,0,0.55);
-      border: 1px solid rgba(255,255,255,0.25);
-      color: rgba(255,255,255,0.95);
-      font-weight: 800;
-      letter-spacing: 0.02em;
-      backdrop-filter: blur(10px);
+      background: rgba(0,0,0,0.42);
+      color: rgba(255,255,255,0.72);
+      font-size: 12px;
+      letter-spacing: 0.03em;
+      opacity: 0;
       pointer-events: none;
+      transition: opacity 600ms ease;
+      backdrop-filter: blur(8px);
+      white-space: nowrap;
     }
-    @media (max-width: 720px) {
-      #controls {
-        justify-content: flex-start;
-        overflow-x: auto;
-        flex-wrap: nowrap;
-      }
-      #now { min-width: 240px; }
+
+    #hint.show {
+      opacity: 1;
+    }
+
+    #debug {
+      display: none;
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      z-index: 40;
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: rgba(0,0,0,0.65);
+      color: #fff;
+      font-size: 12px;
+      max-width: min(70vw, 520px);
+      word-break: break-word;
+    }
+
+    body.debug #debug {
+      display: block;
     }
   </style>
 </head>
 <body>
-  <div id="hint">First input: fullscreen • second input: play • then toggle play/pause</div>
-  <div id="shell">
-    <main id="playerWrap">
-      <iframe id="player"
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
-        allowfullscreen
-        referrerpolicy="strict-origin-when-cross-origin"
-        title="Future Fort random YouTube player"></iframe>
+  <main id="stage" aria-label="Future Fort random ambient video">
+    <div id="player"></div>
+  </main>
 
-      <div id="fallback">
-        <div class="card">
-          <h1>Future Fort</h1>
-          <p id="fallbackText">Choosing a random architecture video...</p>
-          <p style="margin-top:16px;">If the embed gets weird, use “Open YouTube.” Tasker can also launch this page with <code>?mode=redirect</code>.</p>
-        </div>
-      </div>
-
-      <div id="gestureCatcher" tabindex="0" role="button" aria-label="Fullscreen and play control" data-state="Ready"></div>
-    </main>
-
-    <nav id="controls" aria-label="Controls">
-      <button id="shuffleBtn">Shuffle</button>
-      <button id="fullscreenBtn">Fullscreen</button>
-      <a id="openBtn" class="button" target="_blank" rel="noopener">Open YouTube</a>
-      <button id="copyBtn">Copy URL</button>
-      <span id="now"></span>
-    </nav>
-  </div>
+  <div id="gestureCatcher" aria-label="Press or tap for fullscreen and playback"></div>
+  <div id="hint">press once for fullscreen · again for play/pause</div>
+  <div id="debug"></div>
 
   <script>
-    const PLAYLIST = {
-      name: "Future Fort",
-      sourcePlaylistUrl: "https://www.youtube.com/playlist?list=PLgT1MDSlw0KtPmd0RZU02TjSLYa5FjU48",
-      videos: [
-  {
-    "id": "RoGuvvzHY1A",
-    "title": "Video RoGuvvzHY1A",
-    "url": "https://www.youtube.com/watch?v=RoGuvvzHY1A"
-  },
-  {
-    "id": "wzragsRr5lU",
-    "title": "Video wzragsRr5lU",
-    "url": "https://www.youtube.com/watch?v=wzragsRr5lU"
-  },
-  {
-    "id": "SW-NoiM726U",
-    "title": "Video SW-NoiM726U",
-    "url": "https://www.youtube.com/watch?v=SW-NoiM726U"
-  },
-  {
-    "id": "RpI9atf6vBg",
-    "title": "Video RpI9atf6vBg",
-    "url": "https://www.youtube.com/watch?v=RpI9atf6vBg"
-  },
-  {
-    "id": "rQaaftbHMi8",
-    "title": "Video rQaaftbHMi8",
-    "url": "https://www.youtube.com/watch?v=rQaaftbHMi8"
-  },
-  {
-    "id": "3QQTiXGSpUw",
-    "title": "Video 3QQTiXGSpUw",
-    "url": "https://www.youtube.com/watch?v=3QQTiXGSpUw"
-  },
-  {
-    "id": "BUQczoFlzBY",
-    "title": "Video BUQczoFlzBY",
-    "url": "https://www.youtube.com/watch?v=BUQczoFlzBY"
-  },
-  {
-    "id": "GbzmlbWRo-0",
-    "title": "Video GbzmlbWRo-0",
-    "url": "https://www.youtube.com/watch?v=GbzmlbWRo-0"
-  },
-  {
-    "id": "C42Wg2JDRmc",
-    "title": "Video C42Wg2JDRmc",
-    "url": "https://www.youtube.com/watch?v=C42Wg2JDRmc"
-  },
-  {
-    "id": "ZQy89tZ-mRU",
-    "title": "Video ZQy89tZ-mRU",
-    "url": "https://www.youtube.com/watch?v=ZQy89tZ-mRU"
-  },
-  {
-    "id": "UkQHCSZQvv0",
-    "title": "Video UkQHCSZQvv0",
-    "url": "https://www.youtube.com/watch?v=UkQHCSZQvv0"
-  },
-  {
-    "id": "qdvtRzgtjdQ",
-    "title": "Video qdvtRzgtjdQ",
-    "url": "https://www.youtube.com/watch?v=qdvtRzgtjdQ"
-  },
-  {
-    "id": "hNhlD-mEW34",
-    "title": "Video hNhlD-mEW34",
-    "url": "https://www.youtube.com/watch?v=hNhlD-mEW34"
-  },
-  {
-    "id": "8B6xR3T37gI",
-    "title": "Video 8B6xR3T37gI",
-    "url": "https://www.youtube.com/watch?v=8B6xR3T37gI"
-  },
-  {
-    "id": "9QNPB9naZQg",
-    "title": "Video 9QNPB9naZQg",
-    "url": "https://www.youtube.com/watch?v=9QNPB9naZQg"
-  },
-  {
-    "id": "nfx89LDqrJk",
-    "title": "Video nfx89LDqrJk",
-    "url": "https://www.youtube.com/watch?v=nfx89LDqrJk"
-  },
-  {
-    "id": "lG49SF7DAgI",
-    "title": "Video lG49SF7DAgI",
-    "url": "https://www.youtube.com/watch?v=lG49SF7DAgI"
-  },
-  {
-    "id": "zdLAM-wChxY",
-    "title": "Video zdLAM-wChxY",
-    "url": "https://www.youtube.com/watch?v=zdLAM-wChxY"
-  },
-  {
-    "id": "wkW7HZYLnmY",
-    "title": "Video wkW7HZYLnmY",
-    "url": "https://www.youtube.com/watch?v=wkW7HZYLnmY"
-  },
-  {
-    "id": "DL5layf9jxw",
-    "title": "Video DL5layf9jxw",
-    "url": "https://www.youtube.com/watch?v=DL5layf9jxw"
-  },
-  {
-    "id": "hJ8u8JYigK0",
-    "title": "Video hJ8u8JYigK0",
-    "url": "https://www.youtube.com/watch?v=hJ8u8JYigK0"
-  },
-  {
-    "id": "Mpm609b2yGQ",
-    "title": "Video Mpm609b2yGQ",
-    "url": "https://www.youtube.com/watch?v=Mpm609b2yGQ"
-  },
-  {
-    "id": "EL7xW5zTh6M",
-    "title": "Video EL7xW5zTh6M",
-    "url": "https://www.youtube.com/watch?v=EL7xW5zTh6M"
-  },
-  {
-    "id": "WGaICSbCr1c",
-    "title": "Video WGaICSbCr1c",
-    "url": "https://www.youtube.com/watch?v=WGaICSbCr1c"
-  },
-  {
-    "id": "NZulDyerzrA",
-    "title": "Video NZulDyerzrA",
-    "url": "https://www.youtube.com/watch?v=NZulDyerzrA"
-  },
-  {
-    "id": "TX1sRxCrduA",
-    "title": "Video TX1sRxCrduA",
-    "url": "https://www.youtube.com/watch?v=TX1sRxCrduA"
-  },
-  {
-    "id": "-i2Ndgrgcu8",
-    "title": "Video -i2Ndgrgcu8",
-    "url": "https://www.youtube.com/watch?v=-i2Ndgrgcu8"
-  },
-  {
-    "id": "BqPtClvahWw",
-    "title": "Video BqPtClvahWw",
-    "url": "https://www.youtube.com/watch?v=BqPtClvahWw"
-  },
-  {
-    "id": "Xb6TIWub6KU",
-    "title": "Video Xb6TIWub6KU",
-    "url": "https://www.youtube.com/watch?v=Xb6TIWub6KU"
-  },
-  {
-    "id": "V82SVeVXKcA",
-    "title": "Video V82SVeVXKcA",
-    "url": "https://www.youtube.com/watch?v=V82SVeVXKcA"
-  },
-  {
-    "id": "m__xcCj7p6Q",
-    "title": "Video m__xcCj7p6Q",
-    "url": "https://www.youtube.com/watch?v=m__xcCj7p6Q"
-  },
-  {
-    "id": "JM7Vsm4Gm54",
-    "title": "Video JM7Vsm4Gm54",
-    "url": "https://www.youtube.com/watch?v=JM7Vsm4Gm54"
-  },
-  {
-    "id": "4ts15BW-6hw",
-    "title": "Video 4ts15BW-6hw",
-    "url": "https://www.youtube.com/watch?v=4ts15BW-6hw"
-  },
-  {
-    "id": "VT8YGAKvzms",
-    "title": "Video VT8YGAKvzms",
-    "url": "https://www.youtube.com/watch?v=VT8YGAKvzms"
-  },
-  {
-    "id": "GSdzhDzAltU",
-    "title": "Video GSdzhDzAltU",
-    "url": "https://www.youtube.com/watch?v=GSdzhDzAltU"
-  },
-  {
-    "id": "JPYt10zrclQ",
-    "title": "Video JPYt10zrclQ",
-    "url": "https://www.youtube.com/watch?v=JPYt10zrclQ"
-  },
-  {
-    "id": "fyfxB_SqWtc",
-    "title": "Video fyfxB_SqWtc",
-    "url": "https://www.youtube.com/watch?v=fyfxB_SqWtc"
-  },
-  {
-    "id": "ADqFFRuU-Ns",
-    "title": "Video ADqFFRuU-Ns",
-    "url": "https://www.youtube.com/watch?v=ADqFFRuU-Ns"
-  },
-  {
-    "id": "hgQlvJ2cNBo",
-    "title": "Video hgQlvJ2cNBo",
-    "url": "https://www.youtube.com/watch?v=hgQlvJ2cNBo"
-  },
-  {
-    "id": "4fEeh-8OFT8",
-    "title": "Video 4fEeh-8OFT8",
-    "url": "https://www.youtube.com/watch?v=4fEeh-8OFT8"
-  },
-  {
-    "id": "0Trz6NvsUQQ",
-    "title": "Video 0Trz6NvsUQQ",
-    "url": "https://www.youtube.com/watch?v=0Trz6NvsUQQ"
-  },
-  {
-    "id": "4MLJs1KRa0Y",
-    "title": "Video 4MLJs1KRa0Y",
-    "url": "https://www.youtube.com/watch?v=4MLJs1KRa0Y"
-  },
-  {
-    "id": "SOvbFHUpf4k",
-    "title": "Video SOvbFHUpf4k",
-    "url": "https://www.youtube.com/watch?v=SOvbFHUpf4k"
-  },
-  {
-    "id": "j9JD9W0n7gE",
-    "title": "Video j9JD9W0n7gE",
-    "url": "https://www.youtube.com/watch?v=j9JD9W0n7gE"
-  },
-  {
-    "id": "Y16vR6x6X9w",
-    "title": "Video Y16vR6x6X9w",
-    "url": "https://www.youtube.com/watch?v=Y16vR6x6X9w"
-  },
-  {
-    "id": "N1TTiLx5IPc",
-    "title": "Video N1TTiLx5IPc",
-    "url": "https://www.youtube.com/watch?v=N1TTiLx5IPc"
-  },
-  {
-    "id": "YOXkcz8j3Gc",
-    "title": "Video YOXkcz8j3Gc",
-    "url": "https://www.youtube.com/watch?v=YOXkcz8j3Gc"
-  },
-  {
-    "id": "aFn-8eMCPrQ",
-    "title": "Video aFn-8eMCPrQ",
-    "url": "https://www.youtube.com/watch?v=aFn-8eMCPrQ"
-  },
-  {
-    "id": "ThDYazipjSI",
-    "title": "Video ThDYazipjSI",
-    "url": "https://www.youtube.com/watch?v=ThDYazipjSI"
-  },
-  {
-    "id": "8lO8tfBppTc",
-    "title": "Video 8lO8tfBppTc",
-    "url": "https://www.youtube.com/watch?v=8lO8tfBppTc"
-  },
-  {
-    "id": "JKKtQzZis4c",
-    "title": "Video JKKtQzZis4c",
-    "url": "https://www.youtube.com/watch?v=JKKtQzZis4c"
-  },
-  {
-    "id": "2gWxRVqNI3M",
-    "title": "Video 2gWxRVqNI3M",
-    "url": "https://www.youtube.com/watch?v=2gWxRVqNI3M"
-  },
-  {
-    "id": "NnhRzruIWMU",
-    "title": "Video NnhRzruIWMU",
-    "url": "https://www.youtube.com/watch?v=NnhRzruIWMU"
-  },
-  {
-    "id": "y9Ceu9BO1jo",
-    "title": "Video y9Ceu9BO1jo",
-    "url": "https://www.youtube.com/watch?v=y9Ceu9BO1jo"
-  },
-  {
-    "id": "6dX1m6b-6sg",
-    "title": "Video 6dX1m6b-6sg",
-    "url": "https://www.youtube.com/watch?v=6dX1m6b-6sg"
-  },
-  {
-    "id": "YeJdPFyNv30",
-    "title": "Video YeJdPFyNv30",
-    "url": "https://www.youtube.com/watch?v=YeJdPFyNv30"
-  },
-  {
-    "id": "kse4xYeiK-k",
-    "title": "Video kse4xYeiK-k",
-    "url": "https://www.youtube.com/watch?v=kse4xYeiK-k"
-  },
-  {
-    "id": "ceuOzKJlYjc",
-    "title": "Video ceuOzKJlYjc",
-    "url": "https://www.youtube.com/watch?v=ceuOzKJlYjc"
-  },
-  {
-    "id": "MmE6NR4VJV0",
-    "title": "Video MmE6NR4VJV0",
-    "url": "https://www.youtube.com/watch?v=MmE6NR4VJV0"
-  },
-  {
-    "id": "3UVzeDhCpRI",
-    "title": "Video 3UVzeDhCpRI",
-    "url": "https://www.youtube.com/watch?v=3UVzeDhCpRI"
-  },
-  {
-    "id": "1-_rg0kIrdY",
-    "title": "Video 1-_rg0kIrdY",
-    "url": "https://www.youtube.com/watch?v=1-_rg0kIrdY"
-  },
-  {
-    "id": "51VefAxafug",
-    "title": "Video 51VefAxafug",
-    "url": "https://www.youtube.com/watch?v=51VefAxafug"
-  },
-  {
-    "id": "p_ZbTD-2keo",
-    "title": "Video p_ZbTD-2keo",
-    "url": "https://www.youtube.com/watch?v=p_ZbTD-2keo"
-  },
-  {
-    "id": "bUIvZAQmWoc",
-    "title": "Video bUIvZAQmWoc",
-    "url": "https://www.youtube.com/watch?v=bUIvZAQmWoc"
-  },
-  {
-    "id": "IblQ79_r1WI",
-    "title": "Video IblQ79_r1WI",
-    "url": "https://www.youtube.com/watch?v=IblQ79_r1WI"
-  },
-  {
-    "id": "cguhgb-Cu6w",
-    "title": "Video cguhgb-Cu6w",
-    "url": "https://www.youtube.com/watch?v=cguhgb-Cu6w"
-  },
-  {
-    "id": "CUfvBZatXoo",
-    "title": "Video CUfvBZatXoo",
-    "url": "https://www.youtube.com/watch?v=CUfvBZatXoo"
-  },
-  {
-    "id": "5PKFAb5JKGg",
-    "title": "Video 5PKFAb5JKGg",
-    "url": "https://www.youtube.com/watch?v=5PKFAb5JKGg"
-  },
-  {
-    "id": "RBzLZHs_BuY",
-    "title": "Video RBzLZHs_BuY",
-    "url": "https://www.youtube.com/watch?v=RBzLZHs_BuY"
-  },
-  {
-    "id": "g4bwWTIGWlw",
-    "title": "Video g4bwWTIGWlw",
-    "url": "https://www.youtube.com/watch?v=g4bwWTIGWlw"
-  },
-  {
-    "id": "dFEmF_yopDc",
-    "title": "Video dFEmF_yopDc",
-    "url": "https://www.youtube.com/watch?v=dFEmF_yopDc"
-  },
-  {
-    "id": "z1t2c5rNldg",
-    "title": "Video z1t2c5rNldg",
-    "url": "https://www.youtube.com/watch?v=z1t2c5rNldg"
-  },
-  {
-    "id": "A7nAPlu0uZY",
-    "title": "Video A7nAPlu0uZY",
-    "url": "https://www.youtube.com/watch?v=A7nAPlu0uZY"
-  },
-  {
-    "id": "OMUfmlPs_w4",
-    "title": "Video OMUfmlPs_w4",
-    "url": "https://www.youtube.com/watch?v=OMUfmlPs_w4"
-  },
-  {
-    "id": "x9NcRZNaJAA",
-    "title": "Video x9NcRZNaJAA",
-    "url": "https://www.youtube.com/watch?v=x9NcRZNaJAA"
-  },
-  {
-    "id": "MHkUtCiYiII",
-    "title": "Video MHkUtCiYiII",
-    "url": "https://www.youtube.com/watch?v=MHkUtCiYiII"
-  },
-  {
-    "id": "Dxyc5GeWAJ0",
-    "title": "Video Dxyc5GeWAJ0",
-    "url": "https://www.youtube.com/watch?v=Dxyc5GeWAJ0"
-  },
-  {
-    "id": "liyRpnGmPSg",
-    "title": "Video liyRpnGmPSg",
-    "url": "https://www.youtube.com/watch?v=liyRpnGmPSg"
-  },
-  {
-    "id": "e0qNKnwV40E",
-    "title": "Video e0qNKnwV40E",
-    "url": "https://www.youtube.com/watch?v=e0qNKnwV40E"
-  },
-  {
-    "id": "gnhntldzZIc",
-    "title": "Video gnhntldzZIc",
-    "url": "https://www.youtube.com/watch?v=gnhntldzZIc"
-  },
-  {
-    "id": "-k-Yk4Ubhos",
-    "title": "Video -k-Yk4Ubhos",
-    "url": "https://www.youtube.com/watch?v=-k-Yk4Ubhos"
-  },
-  {
-    "id": "ia7jd_1z_aE",
-    "title": "Video ia7jd_1z_aE",
-    "url": "https://www.youtube.com/watch?v=ia7jd_1z_aE"
-  },
-  {
-    "id": "-iP3wgYXchE",
-    "title": "Video -iP3wgYXchE",
-    "url": "https://www.youtube.com/watch?v=-iP3wgYXchE"
-  },
-  {
-    "id": "QA7pd-HTMo0",
-    "title": "Video QA7pd-HTMo0",
-    "url": "https://www.youtube.com/watch?v=QA7pd-HTMo0"
-  },
-  {
-    "id": "A-WEZZy9_gM",
-    "title": "Video A-WEZZy9_gM",
-    "url": "https://www.youtube.com/watch?v=A-WEZZy9_gM"
-  },
-  {
-    "id": "_TFqzw9neys",
-    "title": "Video _TFqzw9neys",
-    "url": "https://www.youtube.com/watch?v=_TFqzw9neys"
-  },
-  {
-    "id": "Wgw9tBynJck",
-    "title": "Video Wgw9tBynJck",
-    "url": "https://www.youtube.com/watch?v=Wgw9tBynJck"
-  },
-  {
-    "id": "HTAhxS-BHzc",
-    "title": "Video HTAhxS-BHzc",
-    "url": "https://www.youtube.com/watch?v=HTAhxS-BHzc"
-  },
-  {
-    "id": "Z6fOe4Bnncg",
-    "title": "Video Z6fOe4Bnncg",
-    "url": "https://www.youtube.com/watch?v=Z6fOe4Bnncg"
-  },
-  {
-    "id": "FV5F_8I8Gzw",
-    "title": "Video FV5F_8I8Gzw",
-    "url": "https://www.youtube.com/watch?v=FV5F_8I8Gzw"
-  },
-  {
-    "id": "eLo7GwiGdWE",
-    "title": "Video eLo7GwiGdWE",
-    "url": "https://www.youtube.com/watch?v=eLo7GwiGdWE"
-  },
-  {
-    "id": "y_k53QmONAY",
-    "title": "Video y_k53QmONAY",
-    "url": "https://www.youtube.com/watch?v=y_k53QmONAY"
-  },
-  {
-    "id": "erFiMZ_vLyQ",
-    "title": "Video erFiMZ_vLyQ",
-    "url": "https://www.youtube.com/watch?v=erFiMZ_vLyQ"
-  },
-  {
-    "id": "U0bHhmpyKGg",
-    "title": "Video U0bHhmpyKGg",
-    "url": "https://www.youtube.com/watch?v=U0bHhmpyKGg"
-  },
-  {
-    "id": "kjn4rgevnCc",
-    "title": "Video kjn4rgevnCc",
-    "url": "https://www.youtube.com/watch?v=kjn4rgevnCc"
-  },
-  {
-    "id": "-j2t1G32lQs",
-    "title": "Video -j2t1G32lQs",
-    "url": "https://www.youtube.com/watch?v=-j2t1G32lQs"
-  },
-  {
-    "id": "Qpl2JCkorCM",
-    "title": "Video Qpl2JCkorCM",
-    "url": "https://www.youtube.com/watch?v=Qpl2JCkorCM"
-  },
-  {
-    "id": "NnKHpMplFbg",
-    "title": "Video NnKHpMplFbg",
-    "url": "https://www.youtube.com/watch?v=NnKHpMplFbg"
-  },
-  {
-    "id": "xEahf8NgX3U",
-    "title": "Video xEahf8NgX3U",
-    "url": "https://www.youtube.com/watch?v=xEahf8NgX3U"
-  },
-  {
-    "id": "9cXZ5vIwpOQ",
-    "title": "Video 9cXZ5vIwpOQ",
-    "url": "https://www.youtube.com/watch?v=9cXZ5vIwpOQ"
-  }
-]
-    };
+    const VIDEOS = [
+      { id: "RoGuvvzHY1A", title: "Future Fort · RoGuvvzHY1A" },
+    { id: "wzragsRr5lU", title: "Future Fort · wzragsRr5lU" },
+    { id: "SW-NoiM726U", title: "Future Fort · SW-NoiM726U" },
+    { id: "RpI9atf6vBg", title: "Future Fort · RpI9atf6vBg" },
+    { id: "rQaaftbHMi8", title: "Future Fort · rQaaftbHMi8" },
+    { id: "3QQTiXGSpUw", title: "Future Fort · 3QQTiXGSpUw" },
+    { id: "BUQczoFlzBY", title: "Future Fort · BUQczoFlzBY" },
+    { id: "GbzmlbWRo-0", title: "Future Fort · GbzmlbWRo-0" },
+    { id: "C42Wg2JDRmc", title: "Future Fort · C42Wg2JDRmc" },
+    { id: "ZQy89tZ-mRU", title: "Future Fort · ZQy89tZ-mRU" },
+    { id: "UkQHCSZQvv0", title: "Future Fort · UkQHCSZQvv0" },
+    { id: "qdvtRzgtjdQ", title: "Future Fort · qdvtRzgtjdQ" },
+    { id: "hNhlD-mEW34", title: "Future Fort · hNhlD-mEW34" },
+    { id: "8B6xR3T37gI", title: "Future Fort · 8B6xR3T37gI" },
+    { id: "9QNPB9naZQg", title: "Future Fort · 9QNPB9naZQg" },
+    { id: "nfx89LDqrJk", title: "Future Fort · nfx89LDqrJk" },
+    { id: "lG49SF7DAgI", title: "Future Fort · lG49SF7DAgI" },
+    { id: "zdLAM-wChxY", title: "Future Fort · zdLAM-wChxY" },
+    { id: "wkW7HZYLnmY", title: "Future Fort · wkW7HZYLnmY" },
+    { id: "DL5layf9jxw", title: "Future Fort · DL5layf9jxw" },
+    { id: "hJ8u8JYigK0", title: "Future Fort · hJ8u8JYigK0" },
+    { id: "Mpm609b2yGQ", title: "Future Fort · Mpm609b2yGQ" },
+    { id: "EL7xW5zTh6M", title: "Future Fort · EL7xW5zTh6M" },
+    { id: "WGaICSbCr1c", title: "Future Fort · WGaICSbCr1c" },
+    { id: "NZulDyerzrA", title: "Future Fort · NZulDyerzrA" },
+    { id: "TX1sRxCrduA", title: "Future Fort · TX1sRxCrduA" },
+    { id: "-i2Ndgrgcu8", title: "Future Fort · -i2Ndgrgcu8" },
+    { id: "BqPtClvahWw", title: "Future Fort · BqPtClvahWw" },
+    { id: "Xb6TIWub6KU", title: "Future Fort · Xb6TIWub6KU" },
+    { id: "V82SVeVXKcA", title: "Future Fort · V82SVeVXKcA" },
+    { id: "m__xcCj7p6Q", title: "Future Fort · m__xcCj7p6Q" },
+    { id: "JM7Vsm4Gm54", title: "Future Fort · JM7Vsm4Gm54" },
+    { id: "4ts15BW-6hw", title: "Future Fort · 4ts15BW-6hw" },
+    { id: "VT8YGAKvzms", title: "Future Fort · VT8YGAKvzms" },
+    { id: "GSdzhDzAltU", title: "Future Fort · GSdzhDzAltU" },
+    { id: "JPYt10zrclQ", title: "Future Fort · JPYt10zrclQ" },
+    { id: "fyfxB_SqWtc", title: "Future Fort · fyfxB_SqWtc" },
+    { id: "ADqFFRuU-Ns", title: "Future Fort · ADqFFRuU-Ns" },
+    { id: "hgQlvJ2cNBo", title: "Future Fort · hgQlvJ2cNBo" },
+    { id: "4fEeh-8OFT8", title: "Future Fort · 4fEeh-8OFT8" },
+    { id: "0Trz6NvsUQQ", title: "Future Fort · 0Trz6NvsUQQ" },
+    { id: "4MLJs1KRa0Y", title: "Future Fort · 4MLJs1KRa0Y" },
+    { id: "SOvbFHUpf4k", title: "Future Fort · SOvbFHUpf4k" },
+    { id: "j9JD9W0n7gE", title: "Future Fort · j9JD9W0n7gE" },
+    { id: "Y16vR6x6X9w", title: "Future Fort · Y16vR6x6X9w" },
+    { id: "N1TTiLx5IPc", title: "Future Fort · N1TTiLx5IPc" },
+    { id: "YOXkcz8j3Gc", title: "Future Fort · YOXkcz8j3Gc" },
+    { id: "aFn-8eMCPrQ", title: "Future Fort · aFn-8eMCPrQ" },
+    { id: "ThDYazipjSI", title: "Future Fort · ThDYazipjSI" },
+    { id: "8lO8tfBppTc", title: "Future Fort · 8lO8tfBppTc" },
+    { id: "JKKtQzZis4c", title: "Future Fort · JKKtQzZis4c" },
+    { id: "2gWxRVqNI3M", title: "Future Fort · 2gWxRVqNI3M" },
+    { id: "NnhRzruIWMU", title: "Future Fort · NnhRzruIWMU" },
+    { id: "y9Ceu9BO1jo", title: "Future Fort · y9Ceu9BO1jo" },
+    { id: "6dX1m6b-6sg", title: "Future Fort · 6dX1m6b-6sg" },
+    { id: "YeJdPFyNv30", title: "Future Fort · YeJdPFyNv30" },
+    { id: "kse4xYeiK-k", title: "Future Fort · kse4xYeiK-k" },
+    { id: "ceuOzKJlYjc", title: "Future Fort · ceuOzKJlYjc" },
+    { id: "MmE6NR4VJV0", title: "Future Fort · MmE6NR4VJV0" },
+    { id: "3UVzeDhCpRI", title: "Future Fort · 3UVzeDhCpRI" },
+    { id: "1-_rg0kIrdY", title: "Future Fort · 1-_rg0kIrdY" },
+    { id: "51VefAxafug", title: "Future Fort · 51VefAxafug" },
+    { id: "p_ZbTD-2keo", title: "Future Fort · p_ZbTD-2keo" },
+    { id: "bUIvZAQmWoc", title: "Future Fort · bUIvZAQmWoc" },
+    { id: "IblQ79_r1WI", title: "Future Fort · IblQ79_r1WI" },
+    { id: "cguhgb-Cu6w", title: "Future Fort · cguhgb-Cu6w" },
+    { id: "CUfvBZatXoo", title: "Future Fort · CUfvBZatXoo" },
+    { id: "5PKFAb5JKGg", title: "Future Fort · 5PKFAb5JKGg" },
+    { id: "RBzLZHs_BuY", title: "Future Fort · RBzLZHs_BuY" },
+    { id: "g4bwWTIGWlw", title: "Future Fort · g4bwWTIGWlw" },
+    { id: "dFEmF_yopDc", title: "Future Fort · dFEmF_yopDc" },
+    { id: "z1t2c5rNldg", title: "Future Fort · z1t2c5rNldg" },
+    { id: "A7nAPlu0uZY", title: "Future Fort · A7nAPlu0uZY" },
+    { id: "OMUfmlPs_w4", title: "Future Fort · OMUfmlPs_w4" },
+    { id: "x9NcRZNaJAA", title: "Future Fort · x9NcRZNaJAA" },
+    { id: "MHkUtCiYiII", title: "Future Fort · MHkUtCiYiII" },
+    { id: "Dxyc5GeWAJ0", title: "Future Fort · Dxyc5GeWAJ0" },
+    { id: "liyRpnGmPSg", title: "Future Fort · liyRpnGmPSg" },
+    { id: "e0qNKnwV40E", title: "Future Fort · e0qNKnwV40E" },
+    { id: "gnhntldzZIc", title: "Future Fort · gnhntldzZIc" },
+    { id: "-k-Yk4Ubhos", title: "Future Fort · -k-Yk4Ubhos" },
+    { id: "ia7jd_1z_aE", title: "Future Fort · ia7jd_1z_aE" },
+    { id: "-iP3wgYXchE", title: "Future Fort · -iP3wgYXchE" },
+    { id: "QA7pd-HTMo0", title: "Future Fort · QA7pd-HTMo0" },
+    { id: "A-WEZZy9_gM", title: "Future Fort · A-WEZZy9_gM" },
+    { id: "_TFqzw9neys", title: "Future Fort · _TFqzw9neys" },
+    { id: "Wgw9tBynJck", title: "Future Fort · Wgw9tBynJck" },
+    { id: "HTAhxS-BHzc", title: "Future Fort · HTAhxS-BHzc" },
+    { id: "Z6fOe4Bnncg", title: "Future Fort · Z6fOe4Bnncg" },
+    { id: "FV5F_8I8Gzw", title: "Future Fort · FV5F_8I8Gzw" },
+    { id: "eLo7GwiGdWE", title: "Future Fort · eLo7GwiGdWE" },
+    { id: "y_k53QmONAY", title: "Future Fort · y_k53QmONAY" },
+    { id: "erFiMZ_vLyQ", title: "Future Fort · erFiMZ_vLyQ" },
+    { id: "U0bHhmpyKGg", title: "Future Fort · U0bHhmpyKGg" },
+    { id: "kjn4rgevnCc", title: "Future Fort · kjn4rgevnCc" },
+    { id: "-j2t1G32lQs", title: "Future Fort · -j2t1G32lQs" },
+    { id: "Qpl2JCkorCM", title: "Future Fort · Qpl2JCkorCM" },
+    { id: "NnKHpMplFbg", title: "Future Fort · NnKHpMplFbg" },
+    { id: "xEahf8NgX3U", title: "Future Fort · xEahf8NgX3U" },
+    { id: "9cXZ5vIwpOQ", title: "Future Fort · 9cXZ5vIwpOQ" }
+    ];
 
     const params = new URLSearchParams(location.search);
-    const mode = params.get("mode") || "embed"; // embed | redirect
-    const avoidRecent = Math.max(0, Number(params.get("avoid") || 12));
-    const startSeconds = Math.max(0, Number(params.get("t") || 0)); // optional fixed start time
-    const autoplay = params.get("autoplay") !== "0";
-    const mute = params.get("mute") === "1"; // useful for browser autoplay testing
+    const REDIRECT_MODE = params.get("mode") === "redirect";
+    const DEBUG = params.get("debug") === "1";
+    const MUTED = params.get("mute") === "1";
+    const RECENT_KEY = "futureFortRecentV4";
+    const RECENT_LIMIT = 12;
 
-    function randomIndex(max) {
-      if (crypto && crypto.getRandomValues) {
-        const arr = new Uint32Array(1);
-        crypto.getRandomValues(arr);
-        return arr[0] % max;
+    if (DEBUG) document.body.classList.add("debug");
+
+    let player = null;
+    let selected = null;
+    let stage = 0; // 0 = needs fullscreen, 1 = needs play, 2 = toggle play/pause
+    let ready = false;
+    let assumedPlaying = false;
+    let lastInputAt = 0;
+
+    const hint = document.getElementById("hint");
+    const debug = document.getElementById("debug");
+    const catcher = document.getElementById("gestureCatcher");
+
+    function log(msg) {
+      debug.textContent = msg;
+    }
+
+    function showHint(message, ms = 2200) {
+      hint.textContent = message;
+      hint.classList.add("show");
+      clearTimeout(showHint._t);
+      showHint._t = setTimeout(() => hint.classList.remove("show"), ms);
+    }
+
+    function getRecent() {
+      try {
+        return JSON.parse(localStorage.getItem(RECENT_KEY) || "[]");
+      } catch {
+        return [];
       }
-      return Math.floor(Math.random() * max);
+    }
+
+    function setRecent(list) {
+      try {
+        localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, RECENT_LIMIT)));
+      } catch {}
     }
 
     function pickVideo() {
-      const key = "futureFortRecentIds";
-      let recent = [];
-      try { recent = JSON.parse(localStorage.getItem(key) || "[]"); } catch (e) {}
+      const recent = new Set(getRecent());
+      let pool = VIDEOS.filter(v => !recent.has(v.id));
+      if (!pool.length) pool = VIDEOS.slice();
 
-      let candidates = PLAYLIST.videos.filter(v => !recent.includes(v.id));
-      if (!candidates.length) candidates = PLAYLIST.videos;
-
-      const pick = candidates[randomIndex(candidates.length)];
-
-      recent = [pick.id, ...recent.filter(id => id !== pick.id)].slice(0, avoidRecent);
-      try { localStorage.setItem(key, JSON.stringify(recent)); } catch (e) {}
-
+      const pick = pool[Math.floor(Math.random() * pool.length)];
+      const nextRecent = [pick.id, ...getRecent().filter(id => id !== pick.id)];
+      setRecent(nextRecent);
       return pick;
     }
 
-    function youtubeWatchUrl(video) {
-      const url = new URL("https://www.youtube.com/watch");
-      url.searchParams.set("v", video.id);
-      if (startSeconds > 0) url.searchParams.set("t", String(startSeconds) + "s");
-      return url.toString();
+    selected = pickVideo();
+
+    if (REDIRECT_MODE) {
+      location.replace(`https://www.youtube.com/watch?v=${selected.id}`);
     }
 
-    function youtubeEmbedUrl(video) {
-      const url = new URL(`https://www.youtube.com/embed/${video.id}`);
-      url.searchParams.set("autoplay", autoplay ? "1" : "0");
-      url.searchParams.set("playsinline", "1");
-      url.searchParams.set("enablejsapi", "1");
-      url.searchParams.set("rel", "0");
-      url.searchParams.set("modestbranding", "1");
-      if (location.origin && location.origin.startsWith("http")) url.searchParams.set("origin", location.origin);
-      if (mute) url.searchParams.set("mute", "1");
-      if (startSeconds > 0) url.searchParams.set("start", String(startSeconds));
-      return url.toString();
-    }
+    function requestFullScreen() {
+      const target = document.documentElement;
+      const fn =
+        target.requestFullscreen ||
+        target.webkitRequestFullscreen ||
+        target.msRequestFullscreen;
 
-    const video = pickVideo();
-    const watch = youtubeWatchUrl(video);
-    const embed = youtubeEmbedUrl(video);
-
-    document.getElementById("now").textContent = `${PLAYLIST.name} • ${video.title} • ${video.id}`;
-    document.getElementById("openBtn").href = watch;
-    document.getElementById("fallbackText").textContent = `Chosen: ${video.title}`;
-
-    if (mode === "redirect") {
-      location.replace(watch);
-    } else {
-      const frame = document.getElementById("player");
-      frame.src = embed;
-      setTimeout(() => {
-        document.getElementById("fallback").style.display = "none";
-      }, 1000);
-    }
-
-    document.getElementById("shuffleBtn").addEventListener("click", () => {
-      const next = new URL(location.href);
-      next.searchParams.set("_", Date.now().toString());
-      location.href = next.toString();
-    });
-
-    const fullscreenBtn = document.getElementById("fullscreenBtn");
-    const playerWrap = document.getElementById("playerWrap");
-    const gestureCatcher = document.getElementById("gestureCatcher");
-    const frame = document.getElementById("player");
-
-    let fullscreenHasBeenRequested = false;
-    let firstPlayCommandHasBeenSent = false;
-    let assumedPlaying = false;
-    let lastGestureAt = 0;
-
-    function flash(message) {
-      gestureCatcher.dataset.state = message;
-      gestureCatcher.classList.add("flash");
-      clearTimeout(gestureCatcher._flashTimer);
-      gestureCatcher._flashTimer = setTimeout(() => gestureCatcher.classList.remove("flash"), 650);
-    }
-
-    function focusCatcher() {
-      try { gestureCatcher.focus({ preventScroll: true }); } catch (e) {}
-    }
-
-    function playerCommand(func, args = []) {
-      try {
-        frame.contentWindow.postMessage(JSON.stringify({
-          event: "command",
-          func,
-          args
-        }), "https://www.youtube.com");
-      } catch (e) {
-        console.log("YouTube command failed:", func, e);
+      if (fn) {
+        try {
+          const result = fn.call(target);
+          if (result && typeof result.catch === "function") {
+            result.catch(() => {});
+          }
+        } catch {}
       }
     }
 
-    async function enterFullscreen() {
+    function playVideo() {
+      if (player && ready && typeof player.playVideo === "function") {
+        try {
+          if (MUTED && typeof player.mute === "function") player.mute();
+          player.playVideo();
+          assumedPlaying = true;
+        } catch {}
+      }
+    }
+
+    function pauseVideo() {
+      if (player && ready && typeof player.pauseVideo === "function") {
+        try {
+          player.pauseVideo();
+          assumedPlaying = false;
+        } catch {}
+      }
+    }
+
+    function togglePlayPause() {
+      if (!player || !ready) return;
+
+      let state = null;
       try {
-        if (!document.fullscreenElement) {
-          await playerWrap.requestFullscreen();
-          fullscreenHasBeenRequested = true;
-          flash("Fullscreen");
+        if (typeof player.getPlayerState === "function") {
+          state = player.getPlayerState();
         }
-      } catch (e) {
-        console.log("Fullscreen blocked:", e);
-        flash("Fullscreen blocked");
-      } finally {
-        focusCatcher();
-      }
-    }
+      } catch {}
 
-    async function toggleFullscreen() {
-      try {
-        if (document.fullscreenElement) {
-          await document.exitFullscreen();
-          flash("Exit fullscreen");
-        } else {
-          await enterFullscreen();
-        }
-      } catch (e) {
-        console.log("Fullscreen toggle blocked:", e);
-      } finally {
-        focusCatcher();
-      }
-    }
-
-    function playFirstThenToggle() {
-      if (!firstPlayCommandHasBeenSent) {
-        playerCommand("playVideo");
-        firstPlayCommandHasBeenSent = true;
-        assumedPlaying = true;
-        flash("Play");
-      } else if (assumedPlaying) {
-        playerCommand("pauseVideo");
-        assumedPlaying = false;
-        flash("Pause");
+      // YouTube states: 1 playing, 2 paused, 0 ended, -1 unstarted, 3 buffering, 5 cued
+      if (state === 1 || assumedPlaying) {
+        pauseVideo();
+        showHint("paused", 900);
       } else {
-        playerCommand("playVideo");
-        assumedPlaying = true;
-        flash("Play");
-      }
-      focusCatcher();
-    }
-
-    async function primaryGesture(source = "input") {
-      const nowTime = Date.now();
-      if (nowTime - lastGestureAt < 220) return;
-      lastGestureAt = nowTime;
-
-      if (!fullscreenHasBeenRequested && !document.fullscreenElement) {
-        await enterFullscreen();
-      } else {
-        playFirstThenToggle();
+        playVideo();
+        showHint("playing", 900);
       }
     }
 
-    fullscreenBtn.addEventListener("click", (event) => {
-      event.stopPropagation();
-      toggleFullscreen();
-    });
+    function primaryInput(source = "input") {
+      const now = Date.now();
+      if (now - lastInputAt < 180) return; // debounce noisy controller/pointer events
+      lastInputAt = now;
+
+      log(`${source} · stage ${stage} · ${selected.id}`);
+
+      if (stage === 0) {
+        requestFullScreen();
+        stage = 1;
+        showHint("fullscreen · press again to play", 1300);
+        return;
+      }
+
+      if (stage === 1) {
+        playVideo();
+        stage = 2;
+        catcher.style.pointerEvents = "none";
+        showHint("playing", 900);
+        return;
+      }
+
+      togglePlayPause();
+    }
+
+    function refreshForShuffle() {
+      location.href = location.pathname + location.search.replace(/[?&]_r=\d+/, "") + (location.search ? "&" : "?") + "_r=" + Date.now();
+    }
+
+    function keyHandler(e) {
+      const key = (e.key || "").toLowerCase();
+      const code = (e.code || "").toLowerCase();
+
+      const primaryKeys = new Set([
+        " ",
+        "spacebar",
+        "enter",
+        "f",
+        "p",
+        "x"
+      ]);
+
+      if (primaryKeys.has(key) || primaryKeys.has(code) || code === "space") {
+        e.preventDefault();
+        e.stopPropagation();
+        primaryInput(`key:${e.key || e.code}`);
+      }
+
+      // Desktop convenience. Odin's Y/refresh behavior is browser-level and may not hit this.
+      if (key === "r") {
+        e.preventDefault();
+        e.stopPropagation();
+        refreshForShuffle();
+      }
+    }
 
     ["click", "pointerdown", "mousedown", "touchstart"].forEach(type => {
-      gestureCatcher.addEventListener(type, (event) => {
-        event.preventDefault();
-        primaryGesture(type);
-      }, { passive: false });
+      window.addEventListener(type, (e) => {
+        // Let the iframe receive normal clicks after fullscreen/play ritual is complete.
+        if (stage < 2) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+        primaryInput(type);
+      }, { passive: false, capture: true });
     });
 
-    let focusAttempts = 0;
-    const focusTimer = setInterval(() => {
-      focusAttempts += 1;
-      focusCatcher();
-      if (focusAttempts > 20) clearInterval(focusTimer);
-    }, 500);
-    window.addEventListener("focus", focusCatcher);
-    document.addEventListener("fullscreenchange", focusCatcher);
+    window.addEventListener("keydown", keyHandler, { capture: true });
+    window.addEventListener("keyup", keyHandler, { capture: true });
 
-    window.addEventListener("keydown", (event) => {
-      const key = event.key;
-      const primaryKeys = ["Enter", " ", "Spacebar", "Space"];
-      if (primaryKeys.includes(key)) {
-        event.preventDefault();
-        primaryGesture("keyboard-primary");
-        return;
-      }
-
-      if (key === "f" || key === "F") {
-        event.preventDefault();
-        toggleFullscreen();
-        return;
-      }
-      if (key === "p" || key === "P" || key === "x" || key === "X") {
-        event.preventDefault();
-        playFirstThenToggle();
-        return;
-      }
-      if (key === "r" || key === "R") {
-        event.preventDefault();
-        document.getElementById("shuffleBtn").click();
-        return;
-      }
-    });
-
-    const lastButtons = new Map();
-    function buttonPressedOnce(pad, index) {
-      const pressed = !!(pad.buttons && pad.buttons[index] && pad.buttons[index].pressed);
-      const key = `${pad.index}:${index}`;
-      const last = !!lastButtons.get(key);
-      lastButtons.set(key, pressed);
-      return pressed && !last;
-    }
+    // Conservative gamepad support for PC context. Android may ignore this.
+    const gamepadState = {};
 
     function pollGamepads() {
-      const pads = navigator.getGamepads ? Array.from(navigator.getGamepads()).filter(Boolean) : [];
+      const pads = navigator.getGamepads ? navigator.getGamepads() : [];
       for (const pad of pads) {
-        if (buttonPressedOnce(pad, 0)) primaryGesture("gamepad-a");
-        if (buttonPressedOnce(pad, 2)) playFirstThenToggle();
-        if (buttonPressedOnce(pad, 9)) playFirstThenToggle();
-        if (buttonPressedOnce(pad, 3)) document.getElementById("shuffleBtn").click();
+        if (!pad) continue;
+        pad.buttons.forEach((button, index) => {
+          const key = `${pad.index}:${index}`;
+          const pressed = !!button.pressed;
+          const was = !!gamepadState[key];
+          if (pressed && !was) {
+            // Most controllers: 0=A, 2=X, 9=Start.
+            if (index === 0 || index === 2 || index === 9) primaryInput(`gamepad:${index}`);
+            // Desktop convenience: Y often index 3 -> refresh/shuffle.
+            if (index === 3) refreshForShuffle();
+          }
+          gamepadState[key] = pressed;
+        });
       }
       requestAnimationFrame(pollGamepads);
     }
-    requestAnimationFrame(pollGamepads);
 
-    setTimeout(() => {
-      const hint = document.getElementById("hint");
-      if (hint) hint.classList.add("hidden");
-    }, 9000);
-
-    document.getElementById("copyBtn").addEventListener("click", async () => {
-      try {
-        await navigator.clipboard.writeText(watch);
-        document.getElementById("copyBtn").textContent = "Copied";
-        setTimeout(() => document.getElementById("copyBtn").textContent = "Copy URL", 900);
-      } catch (e) {
-        prompt("Copy this URL:", watch);
-      }
+    window.addEventListener("gamepadconnected", () => {
+      log("gamepad connected");
+      pollGamepads();
     });
+
+    // Load YouTube IFrame API
+    const tag = document.createElement("script");
+    tag.src = "https://www.youtube.com/iframe_api";
+    document.head.appendChild(tag);
+
+    window.onYouTubeIframeAPIReady = function () {
+      player = new YT.Player("player", {
+        width: "100%",
+        height: "100%",
+        videoId: selected.id,
+        playerVars: {
+          autoplay: 1,
+          mute: MUTED ? 1 : 0,
+          controls: 1,
+          modestbranding: 1,
+          rel: 0,
+          playsinline: 0,
+          fs: 1,
+          iv_load_policy: 3,
+          origin: location.origin
+        },
+        events: {
+          onReady: function(event) {
+            ready = true;
+            try {
+              if (MUTED) event.target.mute();
+              event.target.playVideo();
+            } catch {}
+            showHint("press once for fullscreen · again for play/pause", 2600);
+            log(`loaded ${selected.id}`);
+          },
+          onStateChange: function(event) {
+            if (event.data === 1) assumedPlaying = true;
+            if (event.data === 2 || event.data === 0) assumedPlaying = false;
+          },
+          onError: function(event) {
+            log(`YouTube error ${event.data} on ${selected.id}`);
+            showHint("video error · refreshing", 1200);
+            setTimeout(refreshForShuffle, 1400);
+          }
+        }
+      });
+    };
+
+    // Start polling even without gamepadconnected because some browsers miss the event.
+    if (navigator.getGamepads) requestAnimationFrame(pollGamepads);
   </script>
 </body>
 </html>
